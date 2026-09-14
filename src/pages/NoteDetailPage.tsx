@@ -1,5 +1,5 @@
-import { Link, useParams } from 'react-router-dom'
-import { getNote } from '../services/notesStorage'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { deleteNote, getNote } from '../services/notesStorage'
 import { MarkdownContent } from '../components/MarkdownContent'
 
 type TocItem = { level: 1 | 2 | 3; text: string; id: string }
@@ -8,8 +8,14 @@ const getToc = (content: string): TocItem[] => content.split('\n').map((line) =>
 
 export function NoteDetailPage() {
   const { id = '' } = useParams()
+  const navigate = useNavigate()
   const note = getNote(id)
   if (!note) return <main className="page placeholder-page"><p className="eyebrow">NOTE NOT FOUND</p><h1>找不到这篇笔记</h1><Link className="placeholder-link" to="/notes">返回学习笔记 →</Link></main>
   const toc = getToc(note.content)
-  return <main className="page note-detail-page"><div className="note-detail-actions"><Link className="back-link" to="/notes">← 返回学习笔记</Link><Link className="edit-note-link" to={`/notes/${note.id}/edit`}>编辑笔记</Link></div><header className="note-detail-header"><p className="eyebrow">{note.category} / {note.learningDate}</p><h1>{note.title}</h1><p className="note-detail-summary">{note.summary}</p><div className="note-tags">{note.tags.map((tag) => <span key={tag}>#{tag}</span>)}</div></header><div className="note-reading-layout"><aside className="note-toc"><p>本文目录</p>{toc.length ? <nav>{toc.map((item, index) => <a key={`${item.id}-${index}`} className={`toc-level-${item.level}`} href={`#${item.id}`}>{item.text}</a>)}</nav> : <span className="toc-empty">本文暂无目录</span>}</aside><article className="note-article"><MarkdownContent content={note.content} /></article></div></main>
+  const handleDelete = () => {
+    if (!window.confirm(`确定删除《${note.title}》吗？删除后无法恢复。`)) return
+    deleteNote(note.id)
+    navigate('/notes')
+  }
+  return <main className="page note-detail-page"><div className="note-detail-actions"><Link className="back-link" to="/notes">← 返回学习笔记</Link><div className="note-detail-action-links"><Link className="edit-note-link" to={`/notes/${note.id}/edit`}>编辑笔记</Link><button className="delete-note-button" onClick={handleDelete}>删除笔记</button></div></div><header className="note-detail-header"><p className="eyebrow">{note.category} / {note.learningDate}</p><h1>{note.title}</h1><p className="note-detail-summary">{note.summary}</p><div className="note-tags">{note.tags.map((tag) => <span key={tag}>#{tag}</span>)}</div></header><div className="note-reading-layout"><aside className="note-toc"><p>本文目录</p>{toc.length ? <nav>{toc.map((item, index) => <a key={`${item.id}-${index}`} className={`toc-level-${item.level}`} href={`#${item.id}`}>{item.text}</a>)}</nav> : <span className="toc-empty">本文暂无目录</span>}</aside><article className="note-article"><MarkdownContent content={note.content} /></article></div></main>
 }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Calendar } from '../components/Calendar'
 import { DailyPanel } from '../components/DailyPanel'
 import { emptyDailyRecord, formatDate, getTodayIso, parseDate, startOfMonth } from '../data/calendarData'
@@ -6,6 +6,7 @@ import { getDailyRecords, saveDailyRecord } from '../services/storage'
 import { getNotes } from '../services/notesStorage'
 import type { CalendarDay, DailyRecord } from '../types'
 import { useUiSettings } from '../contexts/UiSettingsContext'
+import { useAuth } from '../contexts/AuthContext'
 
 const buildCalendarDays = (month: Date, records: Record<string, DailyRecord>, selectedDate: string, today: string): CalendarDay[] => {
   const first = startOfMonth(month)
@@ -23,10 +24,12 @@ const buildCalendarDays = (month: Date, records: Record<string, DailyRecord>, se
 
 export function CalendarPage() {
   const { t } = useUiSettings()
+  const { syncVersion } = useAuth()
   const today = getTodayIso()
   const [records, setRecords] = useState<Record<string, DailyRecord>>(() => getDailyRecords())
   const [selectedDate, setSelectedDate] = useState(today)
   const [month, setMonth] = useState(() => startOfMonth(parseDate(selectedDate)))
+  useEffect(() => { setRecords(getDailyRecords()) }, [syncVersion])
   const selectedRecord = records[selectedDate] ?? emptyDailyRecord(selectedDate)
   const days = useMemo(() => buildCalendarDays(month, records, selectedDate, today), [month, records, selectedDate, today])
   const updateSelected = (updates: Partial<DailyRecord>) => {

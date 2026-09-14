@@ -27,6 +27,7 @@ export type DailyRecord = {
   summary: string
   status?: DailyStatus
   topics?: StudyItem[]
+  updatedAt?: string
 }
 
 export type NoteCategory = 'Agent' | '开发基础' | '数据库' | '数据分析' | '求职' | '其他'

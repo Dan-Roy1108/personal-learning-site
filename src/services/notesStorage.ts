@@ -1,5 +1,7 @@
 import { NOTES_STORAGE_KEY } from '../data/notesData'
 import type { StudyNote } from '../types'
+import { queueNoteDelete, queueNoteSync } from './cloudSync'
+import { removeNoteReferences } from './storage'
 
 const readNotes = (): StudyNote[] => {
   try {
@@ -18,5 +20,20 @@ export const saveNote = (note: StudyNote) => {
   if (index >= 0) notes[index] = note
   else notes.push(note)
   try { window.localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(notes)) } catch { /* Keep editor usable when storage is unavailable. */ }
+  queueNoteSync(note)
   return note
+}
+export const replaceNotes = (notes: StudyNote[]) => {
+  try { window.localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(notes)) } catch { /* Keep the current view usable if storage is unavailable. */ }
+}
+
+export const deleteNote = (id: string) => {
+  const notes = readNotes()
+  const nextNotes = notes.filter((note) => note.id !== id)
+  if (nextNotes.length === notes.length) return false
+  try { window.localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(nextNotes)) } catch { return false }
+  removeNoteReferences(id)
+  queueNoteDelete(id)
+  window.dispatchEvent(new Event('learning-notes-change'))
+  return true
 }

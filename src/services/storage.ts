@@ -1,5 +1,6 @@
 import { CALENDAR_RESET_KEY, emptyDailyRecord, STORAGE_KEY } from '../data/calendarData'
 import type { DailyRecord, DailyStatus } from '../types'
+import { queueRecordSync } from './cloudSync'
 
 type StoredRecords = Record<string, DailyRecord>
 const isObject = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object' && !Array.isArray(value)
@@ -33,8 +34,25 @@ export const getDailyRecords = (): StoredRecords => { runCalendarResetOnce(); re
 export const getDailyRecord = (date: string): DailyRecord => getDailyRecords()[date] ?? emptyDailyRecord(date)
 export const saveDailyRecord = (record: DailyRecord) => {
   const records = getDailyRecords()
-  records[record.date] = normalizeRecord(record.date, record)
+  records[record.date] = normalizeRecord(record.date, { ...record, updatedAt: new Date().toISOString() })
   try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(records)) } catch { /* Keep the current view usable if storage is unavailable. */ }
+  queueRecordSync(records[record.date])
   return records[record.date]
 }
 export const updateDailyRecord = (date: string, updates: Partial<DailyRecord>) => saveDailyRecord({ ...getDailyRecord(date), ...updates, date })
+export const replaceDailyRecords = (records: StoredRecords) => {
+  try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(records)) } catch { /* Keep the current view usable if storage is unavailable. */ }
+}
+
+export const removeNoteReferences = (noteId: string) => {
+  const records = getDailyRecords()
+  let changed = false
+  for (const record of Object.values(records)) {
+    if (!record.noteIds.includes(noteId)) continue
+    record.noteIds = record.noteIds.filter((id) => id !== noteId)
+    record.updatedAt = new Date().toISOString()
+    changed = true
+    queueRecordSync(record)
+  }
+  if (changed) replaceDailyRecords(records)
+}

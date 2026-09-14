@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { formatDateLabel, noteTitles, weekdayLabel } from '../data/calendarData'
-import { getNote, getNotes } from '../services/notesStorage'
+import { deleteNote, getNotes } from '../services/notesStorage'
 import type { CompletedTask, DailyRecord, DailyStatus, PlannedTask } from '../types'
 import { useUiSettings } from '../contexts/UiSettingsContext'
 
@@ -23,6 +23,7 @@ function TaskEditor({ kind, initialTitle = '', initialMinutes = '', onSave, onCa
 
 export function DailyPanel({ record, onChange }: DailyPanelProps) {
   const { t } = useUiSettings()
+  const [, setNotesRevision] = useState(0)
   const linkedNotes = getNotes().filter((note) => note.learningDate === record.date)
   const [editing, setEditing] = useState<'reflection' | 'summary' | null>(null)
   const [taskEditor, setTaskEditor] = useState<{ kind: 'planned' | 'completed'; id?: string; title?: string; minutes?: number } | null>(null)
@@ -30,6 +31,11 @@ export function DailyPanel({ record, onChange }: DailyPanelProps) {
   const [completeMinutes, setCompleteMinutes] = useState('')
   const [pendingCheckId, setPendingCheckId] = useState<string | null>(null)
   useEffect(() => { setEditing(null); setTaskEditor(null); setCompleteSource(null); setCompleteMinutes(''); setPendingCheckId(null) }, [record.date])
+  useEffect(() => {
+    const refreshNotes = () => setNotesRevision((value) => value + 1)
+    window.addEventListener('learning-notes-change', refreshNotes)
+    return () => window.removeEventListener('learning-notes-change', refreshNotes)
+  }, [])
   const editPlanned = (task: PlannedTask) => setTaskEditor({ kind: 'planned', id: task.id, title: task.title, minutes: task.estimatedMinutes })
   const editCompleted = (task: CompletedTask) => setTaskEditor({ kind: 'completed', id: task.id, title: task.title, minutes: task.actualMinutes })
   const saveTask = (title: string, minutes?: number) => {
@@ -65,7 +71,7 @@ export function DailyPanel({ record, onChange }: DailyPanelProps) {
     <div className="detail-sections">
       <section className="detail-section"><div className="section-title-row"><h3>{t('plannedList')}</h3><span className="section-count">{t('plannedCount')} {record.plannedTasks.length} {t('items')}</span></div><p className="section-note">{t('plannedHint')}</p><ul className="task-list planned-list">{record.plannedTasks.length ? record.plannedTasks.map((task) => { const transferred = record.completedTasks.some((item) => item.sourceTaskId === task.id); return <li key={task.id}><button aria-label={transferred || pendingCheckId === task.id ? `取消完成 ${task.title}` : `完成 ${task.title}`} className={`task-check ${transferred || pendingCheckId === task.id ? 'checked' : ''}`} onClick={() => togglePlannedCompletion(task)}>{transferred || pendingCheckId === task.id ? '✓' : ''}</button><button className="task-text" onClick={() => editPlanned(task)}>{task.title}</button><time>{formatMinutes(task.estimatedMinutes)}</time><button className="task-action complete-action" onClick={() => togglePlannedCompletion(task)}>{transferred ? '已记录' : '完成'}</button><button className="task-action" onClick={() => editPlanned(task)}>{t('edit')}</button><button className="task-action danger" onClick={() => removePlanned(task.id)}>删除</button></li> }) : <li className="empty-state">{t('noPlans')}</li>}</ul><button className="add-button" onClick={() => addTask('planned')}>＋ {t('addTask')}</button></section>
       <section className="detail-section"><div className="section-title-row"><h3>{t('completed')}</h3><span className="section-count strong">{t('completedCount')} {record.completedTasks.length} {t('items')}</span></div><p className="section-note">{t('completedHint')}</p><ul className="task-list completed-list">{record.completedTasks.length ? record.completedTasks.map((task) => <li key={task.id}><span className="completed-check">✓</span><button className="task-text" onClick={() => editCompleted(task)}>{task.title}</button><time>{formatMinutes(task.actualMinutes)}</time><button className="task-action" onClick={() => editCompleted(task)}>{t('edit')}</button><button className="task-action danger" onClick={() => removeCompleted(task.id)}>删除</button></li>) : <li className="empty-state">{t('noCompleted')}</li>}</ul><button className="add-button" onClick={() => addTask('completed')}>＋ {t('addCompleted')}</button></section>
-      <section className="detail-section compact-section"><div className="section-title-row"><h3>{t('studyNotes')}</h3><a href="/notes">{t('viewAll')} →</a></div>{linkedNotes.length ? <ul className="note-links">{linkedNotes.slice(0, 3).map((note) => <li key={note.id}><a href={`/notes/${note.id}`}><span className="note-link-copy"><strong>{note.title}</strong><small>{note.summary || '把今天的理解留下来'}</small><em>{note.tags.map((tag) => `#${tag}`).join(' ') || '#学习记录'}</em></span><span>{t('open')} →</span></a></li>)}</ul> : <p className="empty-state">{t('noNotes')}</p>}</section>
+      <section className="detail-section compact-section"><div className="section-title-row"><h3>{t('studyNotes')}</h3><a href="/notes">{t('viewAll')} →</a></div>{linkedNotes.length ? <ul className="note-links">{linkedNotes.slice(0, 3).map((note) => <li key={note.id}><a href={`/notes/${note.id}`}><span className="note-link-copy"><strong>{note.title}</strong><small>{note.summary || '把今天的理解留下来'}</small><em>{note.tags.map((tag) => `#${tag}`).join(' ') || '#学习记录'}</em></span><span>{t('open')} →</span></a><button className="note-delete-action" onClick={() => { if (window.confirm(`确定删除《${note.title}》吗？删除后无法恢复。`)) deleteNote(note.id) }}>删除</button></li>)}</ul> : <p className="empty-state">{t('noNotes')}</p>}</section>
       <section className="detail-section text-section"><div className="section-title-row"><h3>{t('reflection')}</h3>{editing !== 'reflection' && <button onClick={() => setEditing('reflection')}>{t('edit')}</button>}</div>{editing === 'reflection' ? <InlineEditor initial={record.reflection} placeholder="今天整体状态怎么样？\n今天做得好的地方是什么？\n有哪些事情没有做好？为什么？\n明天需要调整什么？" onSave={(value) => { onChange({ reflection: value }); setEditing(null) }} onCancel={() => setEditing(null)} /> : <p className={!record.reflection ? 'empty-state' : ''}>{record.reflection || t('noReflection')}</p>}</section>
       <section className="detail-section text-section summary-section"><div className="section-title-row"><h3>{t('summary')}</h3>{editing !== 'summary' && <button onClick={() => setEditing('summary')}>{t('edit')}</button>}</div>{editing === 'summary' ? <InlineEditor initial={record.summary} placeholder="今天最重要的结论是什么？" onSave={(value) => { onChange({ summary: value }); setEditing(null) }} onCancel={() => setEditing(null)} /> : <p className={!record.summary ? 'empty-state' : ''}>{record.summary || t('noSummary')}</p>}</section>
     </div>
