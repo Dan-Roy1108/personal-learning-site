@@ -4,8 +4,9 @@ import { getNotes, replaceNotes } from './notesStorage'
 import { supabase } from './supabase'
 
 let currentUserId: string | null = null
-let syncTimer: ReturnType<typeof setTimeout> | null = null
-let noteDeleteTimer: ReturnType<typeof setTimeout> | null = null
+let recordSyncTimer: ReturnType<typeof setTimeout> | null = null
+let noteSyncTimer: ReturnType<typeof setTimeout> | null = null
+const noteDeleteTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
 export const setCloudUser = (userId: string | null) => { currentUserId = userId }
 export const getCloudUser = () => currentUserId
@@ -66,21 +67,30 @@ const upsertNotes = async (userId: string, notes: StudyNote[]) => {
 
 export const queueRecordSync = (record: DailyRecord) => {
   if (!currentUserId || !supabase) return
-  if (syncTimer) clearTimeout(syncTimer)
-  syncTimer = setTimeout(() => { void upsertRecords(currentUserId!, [record]) }, 250)
+  const userId = currentUserId
+  if (recordSyncTimer) clearTimeout(recordSyncTimer)
+  recordSyncTimer = setTimeout(() => {
+    void upsertRecords(userId, [record]).catch((error) => console.error('同步日历失败', error))
+  }, 250)
 }
 
 export const queueNoteSync = (note: StudyNote) => {
   if (!currentUserId || !supabase) return
-  if (syncTimer) clearTimeout(syncTimer)
-  syncTimer = setTimeout(() => { void upsertNotes(currentUserId!, [note]) }, 250)
+  const userId = currentUserId
+  if (noteSyncTimer) clearTimeout(noteSyncTimer)
+  noteSyncTimer = setTimeout(() => {
+    void upsertNotes(userId, [note]).catch((error) => console.error('同步笔记失败', error))
+  }, 250)
 }
 
 export const queueNoteDelete = (noteId: string) => {
   if (!currentUserId || !supabase) return
-  if (noteDeleteTimer) clearTimeout(noteDeleteTimer)
-  noteDeleteTimer = setTimeout(async () => {
-    const { error } = await supabase!.from('study_notes').delete().eq('user_id', currentUserId!).eq('id', noteId)
+  const userId = currentUserId
+  const existingTimer = noteDeleteTimers.get(noteId)
+  if (existingTimer) clearTimeout(existingTimer)
+  noteDeleteTimers.set(noteId, setTimeout(async () => {
+    noteDeleteTimers.delete(noteId)
+    const { error } = await supabase!.from('study_notes').delete().eq('user_id', userId).eq('id', noteId)
     if (error) console.error('删除云端笔记失败', error)
-  }, 250)
+  }, 250))
 }

@@ -17,7 +17,9 @@ create table if not exists public.study_notes (
 alter table public.daily_records enable row level security;
 alter table public.study_notes enable row level security;
 
+drop policy if exists "Users can manage their daily records" on public.daily_records;
 create policy "Users can manage their daily records" on public.daily_records
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+drop policy if exists "Users can manage their study notes" on public.study_notes;
 create policy "Users can manage their study notes" on public.study_notes
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
