@@ -41,12 +41,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     if (!supabase) return
-    setError(''); const { error: authError } = await supabase.auth.signInWithPassword({ email, password }); if (authError) throw authError
+    setError(''); const { error: authError } = await supabase.auth.signInWithPassword({ email: email.trim(), password }); if (authError) throw authError
   }
   const signUp = async (email: string, password: string) => {
     if (!supabase) return
     const emailRedirectTo = new URL(import.meta.env.BASE_URL, window.location.origin).toString()
-    setError(''); const { error: authError } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo } }); if (authError) throw authError
+    setError(''); const { error: authError } = await supabase.auth.signUp({ email: email.trim(), password, options: { emailRedirectTo } }); if (authError) throw authError
   }
   const signOut = async () => { if (supabase) { const { error: authError } = await supabase.auth.signOut(); if (authError) throw authError } }
   const value = useMemo(() => ({ user, loading, syncing, syncVersion, error, configured: isSupabaseConfigured, signIn, signUp, signOut }), [user, loading, syncing, syncVersion, error])
