@@ -6,11 +6,15 @@ import { NotesPage } from './pages/NotesPage'
 import { NoteEditorPage } from './pages/NoteEditorPage'
 import { NoteDetailPage } from './pages/NoteDetailPage'
 import { NoteEditPage } from './pages/NoteEditPage'
+import { BackupReminder } from './components/BackupControls'
+import { CloudSyncNotice } from './components/CloudSyncNotice'
 
 export default function App() {
   return (
     <div className="app-shell">
       <Header />
+      <CloudSyncNotice />
+      <BackupReminder />
       <Routes>
         <Route path="/calendar" element={<CalendarPage />} />
         <Route path="/notes" element={<NotesPage />} />

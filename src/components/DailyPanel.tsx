@@ -3,6 +3,10 @@ import { formatDateLabel, noteTitles, weekdayLabel } from '../data/calendarData'
 import { deleteNote, getNotes } from '../services/notesStorage'
 import type { CompletedTask, DailyRecord, DailyStatus, PlannedTask } from '../types'
 import { useUiSettings } from '../contexts/UiSettingsContext'
+import { useAuth } from '../contexts/AuthContext'
+import { loadCloudNotesForDate } from '../services/cloudNotes'
+import { cacheNotes } from '../services/notesStorage'
+import type { StudyNote } from '../types'
 
 type DailyPanelProps = { record: DailyRecord; onChange: (updates: Partial<DailyRecord>) => void }
 const statusLabels: Record<DailyStatus, string> = { productive: '高效', normal: '正常', low: '低效', rest: '休息' }
@@ -23,8 +27,11 @@ function TaskEditor({ kind, initialTitle = '', initialMinutes = '', onSave, onCa
 
 export function DailyPanel({ record, onChange }: DailyPanelProps) {
   const { t } = useUiSettings()
-  const [, setNotesRevision] = useState(0)
-  const linkedNotes = getNotes().filter((note) => note.learningDate === record.date)
+  const { user, syncVersion } = useAuth()
+  const [notesRevision, setNotesRevision] = useState(0)
+  const [cloudLinkedNotes, setCloudLinkedNotes] = useState<StudyNote[]>([])
+  const localLinkedNotes = getNotes().filter((note) => note.learningDate === record.date)
+  const linkedNotes = user ? cloudLinkedNotes : localLinkedNotes
   const [editing, setEditing] = useState<'reflection' | 'summary' | null>(null)
   const [taskEditor, setTaskEditor] = useState<{ kind: 'planned' | 'completed'; id?: string; title?: string; minutes?: number } | null>(null)
   const [completeSource, setCompleteSource] = useState<PlannedTask | null>(null)
@@ -34,8 +41,15 @@ export function DailyPanel({ record, onChange }: DailyPanelProps) {
   useEffect(() => {
     const refreshNotes = () => setNotesRevision((value) => value + 1)
     window.addEventListener('learning-notes-change', refreshNotes)
-    return () => window.removeEventListener('learning-notes-change', refreshNotes)
+    window.addEventListener('learning-data-sync', refreshNotes)
+    return () => { window.removeEventListener('learning-notes-change', refreshNotes); window.removeEventListener('learning-data-sync', refreshNotes) }
   }, [])
+  useEffect(() => {
+    if (!user) { setCloudLinkedNotes([]); return }
+    let active = true
+    void loadCloudNotesForDate(user.id, record.date, 3).then((notes) => { if (active) { setCloudLinkedNotes(notes); cacheNotes(notes) } }).catch(() => { if (active) setCloudLinkedNotes(localLinkedNotes.slice(0, 3)) })
+    return () => { active = false }
+  }, [user?.id, record.date, notesRevision, syncVersion])
   const editPlanned = (task: PlannedTask) => setTaskEditor({ kind: 'planned', id: task.id, title: task.title, minutes: task.estimatedMinutes })
   const editCompleted = (task: CompletedTask) => setTaskEditor({ kind: 'completed', id: task.id, title: task.title, minutes: task.actualMinutes })
   const saveTask = (title: string, minutes?: number) => {

@@ -3,6 +3,7 @@ import type { DailyRecord, DailyStatus } from '../types'
 import { queueRecordSync } from './cloudSync'
 
 type StoredRecords = Record<string, DailyRecord>
+const RECORDS_OWNER_KEY = `${STORAGE_KEY}-owner`
 const isObject = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 
 const normalizeRecord = (date: string, value: unknown): DailyRecord => {
@@ -31,6 +32,8 @@ const runCalendarResetOnce = () => {
 }
 
 export const getDailyRecords = (): StoredRecords => { runCalendarResetOnce(); return readRaw() ?? {} }
+export const getDailyRecordsOwner = () => { try { return window.localStorage.getItem(RECORDS_OWNER_KEY) } catch { return null } }
+export const setDailyRecordsOwner = (userId: string | null) => { try { if (userId) window.localStorage.setItem(RECORDS_OWNER_KEY, userId); else window.localStorage.removeItem(RECORDS_OWNER_KEY) } catch { /* Keep the calendar usable when storage is unavailable. */ } }
 export const getDailyRecord = (date: string): DailyRecord => getDailyRecords()[date] ?? emptyDailyRecord(date)
 export const saveDailyRecord = (record: DailyRecord) => {
   const records = getDailyRecords()
@@ -43,6 +46,7 @@ export const updateDailyRecord = (date: string, updates: Partial<DailyRecord>) =
 export const replaceDailyRecords = (records: StoredRecords) => {
   try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(records)) } catch { /* Keep the current view usable if storage is unavailable. */ }
 }
+export const clearCachedDailyRecords = () => { try { window.localStorage.removeItem(STORAGE_KEY); window.localStorage.removeItem(RECORDS_OWNER_KEY) } catch { /* Keep sign out usable when storage is unavailable. */ } }
 
 export const removeNoteReferences = (noteId: string) => {
   const records = getDailyRecords()
