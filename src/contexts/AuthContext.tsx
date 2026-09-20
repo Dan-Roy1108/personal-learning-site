@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import type { User } from '@supabase/supabase-js'
 import { supabase, isSupabaseConfigured } from '../services/supabase'
 import { setCloudUser, syncUserData } from '../services/cloudSync'
+import { clearCachedNotes, getNotesOwner } from '../services/notesStorage'
+import { clearCachedDailyRecords, getDailyRecordsOwner } from '../services/storage'
 
 type AuthContextValue = {
   user: User | null
@@ -24,6 +26,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState('')
 
   const applyUser = async (nextUser: User | null) => {
+    if (nextUser && getNotesOwner() && getNotesOwner() !== nextUser.id) clearCachedNotes()
+    if (nextUser && getDailyRecordsOwner() && getDailyRecordsOwner() !== nextUser.id) clearCachedDailyRecords()
     setUser(nextUser)
     setCloudUser(nextUser?.id ?? null)
     if (!nextUser || !supabase) { setSyncing(false); setSyncVersion((value) => value + 1); return }
@@ -48,7 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const emailRedirectTo = new URL(import.meta.env.BASE_URL, window.location.origin).toString()
     setError(''); const { error: authError } = await supabase.auth.signUp({ email: email.trim(), password, options: { emailRedirectTo } }); if (authError) throw authError
   }
-  const signOut = async () => { if (supabase) { const { error: authError } = await supabase.auth.signOut(); if (authError) throw authError } }
+  const signOut = async () => { if (supabase) { const { error: authError } = await supabase.auth.signOut(); if (authError) throw authError; clearCachedNotes(); clearCachedDailyRecords(); window.dispatchEvent(new Event('learning-notes-change')); window.dispatchEvent(new Event('learning-data-sync')) } }
   const value = useMemo(() => ({ user, loading, syncing, syncVersion, error, configured: isSupabaseConfigured, signIn, signUp, signOut }), [user, loading, syncing, syncVersion, error])
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

@@ -2,26 +2,25 @@ import { useEffect, useState } from 'react'
 import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { X } from 'lucide-react'
-import { getLocalImageId, getStoredImage, isSafeImageSource } from '../services/imageStorage'
+import { isSafeImageSource, resolveImageSource } from '../services/imageStorage'
 
 type MarkdownImageProps = { source?: string; alt?: string; title?: string; onOpen: (source: string, alt: string) => void }
 
 function MarkdownImage({ source = '', alt = '', title, onOpen }: MarkdownImageProps) {
   const [resolvedSource, setResolvedSource] = useState('')
   useEffect(() => {
-    let objectUrl = ''
+    let resolvedUrl = ''
+    let shouldRevoke = false
     let active = true
     const resolveSource = async () => {
-      const imageId = getLocalImageId(source)
-      if (!imageId) { if (active && /^https?:\/\//i.test(source)) setResolvedSource(source); return }
       try {
-        const blob = await getStoredImage(imageId)
-        if (active && blob) { objectUrl = URL.createObjectURL(blob); setResolvedSource(objectUrl) }
+        const resolved = await resolveImageSource(source)
+        if (active && resolved) { resolvedUrl = resolved.url; shouldRevoke = resolved.revoke; setResolvedSource(resolved.url) }
       } catch { if (active) setResolvedSource('') }
     }
     setResolvedSource('')
     void resolveSource()
-    return () => { active = false; if (objectUrl) URL.revokeObjectURL(objectUrl) }
+    return () => { active = false; if (resolvedUrl && shouldRevoke) URL.revokeObjectURL(resolvedUrl) }
   }, [source])
   if (!isSafeImageSource(source)) return null
   if (!resolvedSource) return <span className="markdown-image-placeholder">图片正在读取…</span>

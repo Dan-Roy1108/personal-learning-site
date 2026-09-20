@@ -30,6 +30,11 @@ export function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState(today)
   const [month, setMonth] = useState(() => startOfMonth(parseDate(selectedDate)))
   useEffect(() => { setRecords(getDailyRecords()) }, [syncVersion])
+  useEffect(() => {
+    const refresh = () => setRecords(getDailyRecords())
+    window.addEventListener('learning-data-sync', refresh)
+    return () => window.removeEventListener('learning-data-sync', refresh)
+  }, [])
   const selectedRecord = records[selectedDate] ?? emptyDailyRecord(selectedDate)
   const days = useMemo(() => buildCalendarDays(month, records, selectedDate, today), [month, records, selectedDate, today])
   const updateSelected = (updates: Partial<DailyRecord>) => {
